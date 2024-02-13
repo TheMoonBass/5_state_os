@@ -9,12 +9,15 @@ int main(int argc, char* argv[])
 {
     // single thread processor
     // it's either processing something or it's not
-//    bool processorAvailable = true;
+    bool processorAvailable = true;
 
     // vector of processes, processes will appear here when they are created by
     // the ProcessMgmt object (in other words, automatically at the appropriate time)
     list<Process> processList;
     
+    // Vector of complete processes
+    list<Process> completeProcesses;
+
     // this will orchestrate process creation in our system, it will add processes to 
     // processList when they are created and ready to be run/managed
     ProcessManagement processMgmt(processList);
@@ -60,7 +63,7 @@ int main(int argc, char* argv[])
 //    processorAvailable = true;
 
     //keep running the loop until all processes have been added and have run to completion
-    while(processMgmt.moreProcessesComing()  /* TODO add something to keep going as long as there are processes that arent done! */ )
+    while(processMgmt.moreProcessesComing() && (completeProcesses.back().id != processList.back().id) /* TODO add something to keep going as long as there are processes that arent done! */ )
     {
         //Update our current time step
         ++time;
@@ -85,7 +88,7 @@ int main(int argc, char* argv[])
         
         //TODO add in the code to take an appropriate action for this time step!
         //you should set the action variable based on what you do this time step. you can just copy and paste the lines below and uncomment them, if you want.
-        //stepAction = continueRun;  //runnning process is still running
+        //stepAction = continueRun;  //running process is still running
         //stepAction = ioRequest;  //running process issued an io request
         //stepAction = complete;   //running process is finished
         //stepAction = admitNewProc;   //admit a new process into 'ready'
@@ -95,7 +98,65 @@ int main(int argc, char* argv[])
         
 
         //   <your code here> 
+        if (processorAvailable == false) { // If the processor is in use
+        	 for(auto & Proc: processList) { // Begin looking through processes
+        		 if (Proc.state == processing){ // Find the running one
+        			 Proc.processorTime += 1;
+        			 if(Proc.ioEvents.front().time == time) { // Check for an IO event and issue it
+        				 stepAction = ioRequest;
+        				 ioModule.submitIORequest(time, Proc.ioEvents.front(), Proc);
+        				 Proc.state = blocked;
+        				 processorAvailable = true;
+        				 break;
+        			 }
+        			 else if(Proc.reqProcessorTime == Proc.processorTime) { // Check for completion
+        				 stepAction = complete;
+        				 Proc.state = done;
+        				 completeProcesses.push_back(Proc);
+        				 processorAvailable = true;
+        				 break;
+        			 }
+        			 else { // Else continue processing
+        				 stepAction = continueRun;
+        				 break;
+        			 }
+        		 }
+        	 }
+        }
+        else {
+        	for(auto & Proc: processList) {//Find the first new proc if it exists
+        		if(Proc.state == newArrival) {
+        			stepAction = admitNewProc;
+        			Proc.state = ready;
+        			break;
+        		}
+        	}
+        	if(!interrupts.empty() && (stepAction == noAct)) { //Check for interrupts
+        		unsigned int temp = interrupts.front().procID;
+        		for(auto & Proc: processList) { //find the corresponding process
+        			if(Proc.id == temp) {
+        				stepAction = handleInterrupt;
+        				Proc.state = ready;//reactivate it
+        				interrupts.pop_front();
+        				break;
+        			}
+        		}
 
+        	}
+        	if(stepAction == noAct) {
+        		for(auto & Proc: processList) {
+        			if(Proc.state == ready) {
+        				stepAction = beginRun;
+        				Proc.state = processing;
+        				processorAvailable = false;
+        				break;
+        			}
+        		}
+        	}
+
+
+
+        }
 
 
 
