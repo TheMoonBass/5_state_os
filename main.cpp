@@ -17,6 +17,8 @@ int main(int argc, char* argv[])
     
     // Vector of complete processes
     list<Process> completeProcesses;
+    list<unsigned int> readyList;
+
 
     // this will orchestrate process creation in our system, it will add processes to 
     // processList when they are created and ready to be run/managed
@@ -63,7 +65,7 @@ int main(int argc, char* argv[])
 //    processorAvailable = true;
 
     //keep running the loop until all processes have been added and have run to completion
-    while(processMgmt.moreProcessesComing() && (completeProcesses.back().id != processList.back().id) /* TODO add something to keep going as long as there are processes that arent done! */ )
+    while(processMgmt.moreProcessesComing() || (completeProcesses.back().id != processList.back().id) /* TODO add something to keep going as long as there are processes that arent done! */ )
     {
         //Update our current time step
         ++time;
@@ -102,16 +104,19 @@ int main(int argc, char* argv[])
         	 for(auto & Proc: processList) { // Begin looking through processes
         		 if (Proc.state == processing){ // Find the running one
         			 Proc.processorTime += 1;
-        			 if(Proc.ioEvents.front().time == time) { // Check for an IO event and issue it
+        			 if((Proc.ioEvents.front().time == Proc.processorTime) && (!Proc.ioEvents.empty())) { // Check for an IO event and issue it
         				 stepAction = ioRequest;
         				 ioModule.submitIORequest(time, Proc.ioEvents.front(), Proc);
         				 Proc.state = blocked;
+        				 Proc.ioEvents.pop_front();
+        				 readyList.pop_front();
         				 processorAvailable = true;
         				 break;
         			 }
         			 else if(Proc.reqProcessorTime == Proc.processorTime) { // Check for completion
         				 stepAction = complete;
         				 Proc.state = done;
+        				 readyList.pop_front();
         				 completeProcesses.push_back(Proc);
         				 processorAvailable = true;
         				 break;
@@ -128,6 +133,7 @@ int main(int argc, char* argv[])
         		if(Proc.state == newArrival) {
         			stepAction = admitNewProc;
         			Proc.state = ready;
+        			readyList.push_back(Proc.id);
         			break;
         		}
         	}
@@ -137,6 +143,7 @@ int main(int argc, char* argv[])
         			if(Proc.id == temp) {
         				stepAction = handleInterrupt;
         				Proc.state = ready;//reactivate it
+        				readyList.push_back(Proc.id);
         				interrupts.pop_front();
         				break;
         			}
@@ -145,7 +152,7 @@ int main(int argc, char* argv[])
         	}
         	if(stepAction == noAct) {
         		for(auto & Proc: processList) {
-        			if(Proc.state == ready) {
+        			if(Proc.state == ready && (Proc.id == readyList.front())) {
         				stepAction = beginRun;
         				Proc.state = processing;
         				processorAvailable = false;
@@ -193,7 +200,9 @@ int main(int argc, char* argv[])
         // You may wish to use a second vector of processes (you don't need to, but you can)
         printProcessStates(processList); // change processList to another vector of processes if desired
 
+
         this_thread::sleep_for(chrono::milliseconds(sleepDuration));
+
     }
 
     return 0;
