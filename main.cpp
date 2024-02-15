@@ -65,7 +65,7 @@ int main(int argc, char* argv[])
 //    processorAvailable = true;
 
     //keep running the loop until all processes have been added and have run to completion
-    while(processMgmt.moreProcessesComing() || (completeProcesses.back().id != processList.back().id) /* TODO add something to keep going as long as there are processes that arent done! */ )
+    while(processMgmt.moreProcessesComing() || (completeProcesses.size()!= processList.size()) /* TODO add something to keep going as long as there are processes that arent done! */ )
     {
         //Update our current time step
         ++time;
